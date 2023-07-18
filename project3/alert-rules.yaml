@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: example
+    role: alert-rules
+  name: example
+spec:
+  groups:
+  - name: ./example.rules
+    rules:
+    - alert: FailedLivenessProbe
+      expr: kube_pod_container_status_waiting_reason{reason="LivenessProbeFailed"} > 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Liveness probe failed"
+        description: "The liveness probe has failed for the pod {{$labels.namespaces}}/{{$labels.pod}}"

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    </head>
+    <body>
+        <!-- search -->
+        <body>
+            <h1>Search Image</h1>
+            <button id="start">Start Listening</button>
+            <button id="stop">Stop Listening</button>
+            <br><br>
+            <textarea id="output" rows="2" cols="30"></textarea>
+            
+            <script>
+                const startButton = document.getElementById('start');
+                const stopButton = document.getElementById('stop');
+                const output = document.getElementById('output');
+                
+                // Check if the browser supports the SpeechRecognition API
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                
+                if (!SpeechRecognition) {
+                    alert('Your browser does not support the SpeechRecognition API.');
+                } else {
+                    const recognition = new SpeechRecognition();
+                    recognition.lang = 'en-US'; // Set the language
+                    recognition.interimResults = true; // Get interim results
+                    
+                    startButton.addEventListener('click', () => {
+                        recognition.start();
+                    });
+                    
+                    stopButton.addEventListener('click', () => {
+                        recognition.stop();
+                    });
+                    
+                    recognition.addEventListener('result', (event) => {
+                        const transcript = Array.from(event.results)
+                            .map(result => result[0])
+                            .map(result => result.transcript)
+                            .join('');
+                        output.value = transcript;
+                    });
+                    
+                    recognition.addEventListener('end', () => {
+                        console.log('Speech recognition ended');
+                    });
+                }
+
+                function searchimage(){
+                    let input = document.getElementById("output").value;
+                    console.log(input)
+                    let url = "https://hke9e7ed9f.execute-api.us-east-1.amazonaws.com/v1/search?q=" + input;
+                    console.log(url)
+                    axios.get(url).then(function (response) {
+                        console.log(response);
+                        if (response.status != 200){
+                            console.log("failed");
+                        }
+                        var images = response.data
+                        console.log(images)
+
+                        var generateImg = document.getElementById("imagedisplay");
+                        console.log(generateImg)
+                        while (generateImg.firstChild) {
+                            generateImg.removeChild(generateImg.firstChild)
+                        }
+                        for (var i = 0; i < images.length; i++){
+                            console.log(images[i])
+                            var newImg = document.createElement("img");
+                            newImg.style.height = '200px';
+                            newImg.classList.add();
+                            newImg.src = images[i];
+                            generateImg.appendChild(newImg);
+                        }
+                        }).catch(function (error) {
+                        console.log(error);
+                        });  
+                }
+                
+            </script>
+            <br><br>
+            <button onclick ="searchimage()" class="button" type = "button" id = "search"> Search images </button>
+            <div id = "imagedisplay">
+            </div>
+            <br><br> 
+        </body>
+
+
+        <!-- upload -->
+
+        <body>
+            <h1>Upload Image</h1>
+            <input type = "file" id = "fileinput"  />
+            <br><br> 
+            <input type = "text" id = "custom_label" name = "customLabel">
+            <button class="button" type = "button" id = "upload"> Upload images </button>
+            <script>
+              let urlPrefix = 'https://hke9e7ed9f.execute-api.us-east-1.amazonaws.com/v1/upload/photoscloud6998/'
+               document.getElementById('upload').addEventListener('click', async () => {
+  const imageFile = document.getElementById('fileinput').files[0];
+  let description = document.getElementById('custom_label').value;
+
+  if (!imageFile) {
+    alert('Please select an image file.');
+    return;
+  }
+
+  if (description == null || description.length == 0) {
+    description = '';
+  }
+
+  // Encode the description value
+  const encodedDescription = encodeURIComponent(description);
+
+  // Obtain the MIME type of the image file
+  const mimeType = imageFile.type;
+
+  let fileName = imageFile.name;
+  console.log(fileName)
+  let pos = fileName.lastIndexOf('/');
+  let fileSubName;
+  if (pos != -1) {
+    fileSubName = fileName.substring(pos + 1);
+  } else {
+    fileSubName = fileName;
+  }
+  console.log('subname')
+  console.log(fileSubName);
+
+  let requestUrl =  urlPrefix + fileSubName;
+  console.log('request URL:' + requestUrl)
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('PUT', requestUrl);
+  xhr.setRequestHeader('Content-Type', mimeType);
+  xhr.setRequestHeader('x-amz-meta-customLabels', encodedDescription);
+
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      if (xhr.status === 200) {
+        alert('Image and description successfully uploaded.');
+      } else {
+        alert('Something went wrong, please try again.');
+      }
+    }
+  };
+
+  xhr.send(imageFile);
+});
+
+
+            </script>
+        </body>
+        
+    </body>
+</html>

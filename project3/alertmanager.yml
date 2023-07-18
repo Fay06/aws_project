@@ -1,0 +1,46 @@
+global:
+  resolve_timeout: 5m
+inhibit_rules:
+- equal:
+  - namespace
+  - alertname
+  source_matchers:
+  - severity = critical
+  target_matchers:
+  - severity =~ warning|info
+- equal:
+  - namespace
+  - alertname
+  source_matchers:
+  - severity = warning
+  target_matchers:
+  - severity = info
+- equal:
+  - namespace
+  source_matchers:
+  - alertname = InfoInhibitor
+  target_matchers:
+  - severity = info
+receivers:
+  - name: 'slack-receiver'
+    slack_configs:
+    - api_url: 'https://hooks.slack.com/services/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'
+      channel: '#hw3'
+      text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 5m
+  receiver: 'slack-receiver'
+  routes:
+  - match:
+      severity: critical
+    receiver: 'slack-receiver'
+  - match:
+      alertname: FlaskAppReplicasTooLow
+    receiver: 'slack-receiver'
+
+templates:
+- /etc/alertmanager/config/*.tmpl

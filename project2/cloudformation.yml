@@ -1,0 +1,241 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Photo Album
+Resources:
+  # Create APIGateway
+  APIGateway:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: 'AI Photo Search'
+      Description: 'AI Photo Search application, built during the Cloud and Big Data course at Columbia University.'
+      ApiKeySourceType: HEADER
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Parameters:
+        endpointConfigurationTypes: REGIONAL
+
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Body: 
+        swagger: "2.0"
+        info:
+          description: "AI Photo Search application, built during the Cloud and Big Data course\
+            \ at Columbia University."
+          version: "1.0.0"
+          title: "AI Photo Search"
+        host: "hke9e7ed9f.execute-api.us-east-1.amazonaws.com"
+        basePath: "/v1"
+        schemes:
+        - "https"
+        paths:
+          /search:
+            get:
+              operationId: "searchPhotos"
+              produces:
+              - "application/json"
+              parameters:
+              - name: "q"
+                in: "query"
+                required: false
+                type: "string"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/SearchResponse"
+                "500":
+                  description: "500 response"
+                  schema:
+                    $ref: "#/definitions/Error"
+                "403":
+                  description: "403 response"
+                  schema:
+                    $ref: "#/definitions/Error"
+          /upload/{bucket}/{key}:
+            put:
+              parameters:
+              - name: "x-amz-meta-customlabels"
+                in: "header"
+                required: false
+                type: "string"
+              - name: "key"
+                in: "path"
+                required: true
+                type: "string"
+              - name: "bucket"
+                in: "path"
+                required: true
+                type: "string"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+            options:
+              consumes:
+              - "application/json"
+              parameters:
+              - name: "bucket"
+                in: "path"
+                required: true
+                type: "string"
+              - name: "key"
+                in: "path"
+                required: true
+                type: "string"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+        definitions:
+          Error:
+            type: "object"
+            properties:
+              code:
+                type: "integer"
+                format: "int32"
+              message:
+                type: "string"
+          Photo:
+            type: "object"
+            properties:
+              url:
+                type: "string"
+              labels:
+                type: "array"
+                items:
+                  type: "string"
+          SearchResponse:
+            type: "object"
+            properties:
+              results:
+                type: "array"
+                items:
+                  $ref: "#/definitions/Photo"
+
+  HW2LambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: HW2-Lambda-Role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+                - apigateway.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonAPIGatewayAdministrator'
+        - 'arn:aws:iam::aws:policy/AmazonAPIGatewayInvokeFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonRekognitionFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonLexFullAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AmazonRekognitionServiceRole'
+        - 'arn:aws:iam::aws:policy/AmazonRekognitionCustomLabelsFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3OutpostsFullAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AmazonS3ObjectLambdaExecutionRolePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonOpenSearchServiceFullAccess'
+
+  LF1:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: upload
+      Handler: upload.lambda_handler
+      Runtime: python3.9 
+      Description: upload the image
+      MemorySize: 128
+      Timeout: 30
+      Role: !GetAtt HW2LambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: us-east-1
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+            return True
+    DependsOn:
+      - HW2LambdaRole
+      
+  LF2:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: search
+      Handler: search.lambda_handler
+      Runtime: python3.9
+      Description: search the image
+      MemorySize: 128
+      Timeout: 30
+      Role: !GetAtt HW2LambdaRole.Arn
+      Environment:
+        Variables:
+          REGION: us-east-1
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+            return True
+    DependsOn:
+      - HW2LambdaRole
+
+  # Create OpenSearch
+  OpenSearch:
+    Type: 'AWS::OpenSearchService::Domain'
+    DeletionPolicy: Retain
+    Properties:
+      DomainName: "photo-album-opensearch"
+      EngineVersion: 'OpenSearch_2.5'
+      ClusterConfig:
+        InstanceCount: '1'
+        ZoneAwarenessEnabled: false
+        InstanceType: 't3.small.search'
+        DedicatedMasterEnabled: false
+      EBSOptions:
+        EBSEnabled: true
+        Iops: '3000'
+        VolumeSize: '10'
+        VolumeType: 'gp3'
+        Throughput: '125'
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+      DomainEndpointOptions:
+        EnforceHTTPS: true
+      EncryptionAtRestOptions:
+        Enabled: true
+      AdvancedSecurityOptions:
+        Enabled: true
+        MasterUserOptions: 
+          MasterUserARN: !GetAtt HW2LambdaRole.Arn
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Effect: 'Allow'
+            Principal:
+              AWS: '*'
+            Action: 'es:*'
+            Resource: 'arn:aws:es:us-east-1:837163409163:domain/photos/*'
+  
+  # create S3
+  S3:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: PublicRead
+      BucketName: hw2-photo-album-bucket
+      WebsiteConfiguration:
+        IndexDocument: index.html
+      VersioningConfiguration: 
+        Status: Enabled
